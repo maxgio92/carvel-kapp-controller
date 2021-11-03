@@ -58,6 +58,16 @@ RUN wget -O- https://github.com/mozilla/sops/releases/download/v3.6.1/sops-v3.6.
   echo "b2252aa00836c72534471e1099fa22fab2133329b62d7826b5ac49511fcc8997  /usr/local/bin/sops" | sha256sum -c - && \
   chmod +x /usr/local/bin/sops && sops -v
 
+# Kubectl
+RUN curl -L -o /usr/local/bin/kubectl https://dl.k8s.io/release/v1.22.3/bin/linux/amd64/kubectl \
+&& chmod +x /usr/local/bin/kubectl
+
+# Buildkit CLI
+RUN curl -L -o /tmp/kubectl-buildkit.tgz https://github.com/vmware-tanzu/buildkit-cli-for-kubectl/releases/download/v0.1.4/linux-v0.1.4.tgz \
+&& tar -C /tmp -zxf /tmp/kubectl-buildkit.tgz \
+&& install /tmp/kubectl-buildkit /usr/local/bin/ \
+&& install /tmp/kubectl-build /usr/local/bin/
+
 # kapp-controller
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -mod=vendor -ldflags=-buildid= -trimpath -o controller ./cmd/main.go
@@ -80,6 +90,12 @@ COPY --from=0 /helm-unpacked/linux-amd64/helm .
 COPY --from=0 /usr/local/bin/imgpkg .
 COPY --from=0 /usr/local/bin/vendir .
 
+# builders
+RUN mkdir -p /home/kapp-controller/.local/bin
+COPY --from=0 /usr/local/bin/kubectl /home/kapp-controller/.local/bin/
+COPY --from=0 /usr/local/bin/kubectl-build /home/kapp-controller/.local/bin/
+COPY --from=0 /usr/local/bin/kubectl-buildkit /home/kapp-controller/.local/bin/
+
 # templaters
 COPY --from=0 /usr/local/bin/ytt .
 COPY --from=0 /usr/local/bin/kbld .
@@ -88,5 +104,6 @@ COPY --from=0 /usr/local/bin/sops .
 # deployers
 COPY --from=0 /usr/local/bin/kapp .
 
-ENV PATH="/:${PATH}"
+ENV PATH="/:${PATH}:/home/kapp-controller/.local/bin"
+
 ENTRYPOINT ["/kapp-controller"]
