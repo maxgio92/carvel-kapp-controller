@@ -60,7 +60,9 @@ RUN wget -O- https://github.com/mozilla/sops/releases/download/v3.6.1/sops-v3.6.
 
 # Kubectl
 RUN curl -L -o /usr/local/bin/kubectl https://dl.k8s.io/release/v1.22.3/bin/linux/amd64/kubectl \
-&& chmod +x /usr/local/bin/kubectl
+&& chmod +x /usr/local/bin/kubectl \
+&& curl -L -o /tmp/kubectl.sha256 https://dl.k8s.io/v1.22.3/bin/linux/amd64/kubectl.sha256 \
+&& echo "$(</tmp/kubectl.sha256) /usr/local/bin/kubectl" | sha256sum --check
 
 # Buildkit CLI
 RUN curl -L -o /tmp/kubectl-buildkit.tgz https://github.com/vmware-tanzu/buildkit-cli-for-kubectl/releases/download/v0.1.4/linux-v0.1.4.tgz \
