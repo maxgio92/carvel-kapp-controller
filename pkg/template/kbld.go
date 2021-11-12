@@ -45,6 +45,7 @@ func (t *Kbld) template(dirPath string, input io.Reader) exec.CmdRunResult {
 	cmd.Stdin = input
 	cmd.Stdout = &stdoutBs
 	cmd.Stderr = &stderrBs
+	cmd.Dir = dirPath
 
 	err = cmd.Run()
 
