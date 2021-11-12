@@ -22,8 +22,8 @@ RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
 WORKDIR /go/src/github.com/vmware-tanzu/carvel-kapp-controller/
 
 # carvel
-RUN wget -O- https://github.com/vmware-tanzu/carvel-ytt/releases/download/v0.34.0/ytt-linux-amd64 > /usr/local/bin/ytt && \
-  echo "49741ac5540fc64da8566f3d1c9538f4f0fec22c62b8ba83e5e3d8efb91ee170  /usr/local/bin/ytt" | sha256sum -c - && \
+RUN wget -O- https://github.com/vmware-tanzu/carvel-ytt/releases/download/v0.37.0/ytt-linux-amd64 > /usr/local/bin/ytt && \
+  echo "1aad12386f6bae1a78197acdc7ec9e60c441f82c4ca944df8d3c78625750fe59  /usr/local/bin/ytt" | sha256sum -c - && \
   chmod +x /usr/local/bin/ytt && ytt version
 
 RUN wget -O- https://github.com/vmware-tanzu/carvel-kapp/releases/download/v0.37.0/kapp-linux-amd64 > /usr/local/bin/kapp && \
@@ -58,6 +58,18 @@ RUN wget -O- https://github.com/mozilla/sops/releases/download/v3.6.1/sops-v3.6.
   echo "b2252aa00836c72534471e1099fa22fab2133329b62d7826b5ac49511fcc8997  /usr/local/bin/sops" | sha256sum -c - && \
   chmod +x /usr/local/bin/sops && sops -v
 
+# Kubectl
+RUN curl -L -o /usr/local/bin/kubectl https://dl.k8s.io/release/v1.22.3/bin/linux/amd64/kubectl \
+	&& chmod +x /usr/local/bin/kubectl \
+	&& curl -L -o /tmp/kubectl.sha256 https://dl.k8s.io/v1.22.3/bin/linux/amd64/kubectl.sha256 \
+	&& echo "$(</tmp/kubectl.sha256) /usr/local/bin/kubectl" | sha256sum --check
+
+# Buildkit CLI
+RUN curl -L -o /tmp/kubectl-buildkit.tgz https://github.com/vmware-tanzu/buildkit-cli-for-kubectl/releases/download/v0.1.4/linux-v0.1.4.tgz \
+	&& tar -C /tmp -zxf /tmp/kubectl-buildkit.tgz \
+	&& install /tmp/kubectl-buildkit /usr/local/bin/ \
+	&& install /tmp/kubectl-build /usr/local/bin/
+
 # kapp-controller
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -mod=vendor -ldflags=-buildid= -trimpath -o controller ./cmd/main.go
@@ -80,6 +92,12 @@ COPY --from=0 /helm-unpacked/linux-amd64/helm .
 COPY --from=0 /usr/local/bin/imgpkg .
 COPY --from=0 /usr/local/bin/vendir .
 
+# builders
+RUN mkdir -p /home/kapp-controller/.local/bin
+COPY --from=0 /usr/local/bin/kubectl /home/kapp-controller/.local/bin/
+COPY --from=0 /usr/local/bin/kubectl-build /home/kapp-controller/.local/bin/
+COPY --from=0 /usr/local/bin/kubectl-buildkit /home/kapp-controller/.local/bin/
+
 # templaters
 COPY --from=0 /usr/local/bin/ytt .
 COPY --from=0 /usr/local/bin/kbld .
@@ -88,5 +106,6 @@ COPY --from=0 /usr/local/bin/sops .
 # deployers
 COPY --from=0 /usr/local/bin/kapp .
 
-ENV PATH="/:${PATH}"
+ENV PATH="/:${PATH}:/home/kapp-controller/.local/bin"
+
 ENTRYPOINT ["/kapp-controller"]
